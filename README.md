@@ -262,3 +262,137 @@ def draw_line(canvas, x0, y0, x1, y1, debug=False):
             self.draw_point(x0 - x, y0 - y) # Рисуем симметричную точку в левой части параболы
             x += step # Увеличиваем x на шаг для перехода к следующей точке
 ```
+
+
+![image](https://github.com/user-attachments/assets/46429670-ce72-4e06-90b8-78e0cf3d043e)
+
+![image](https://github.com/user-attachments/assets/369ddbb6-8aa9-4b9c-894f-647946092561)
+
+![image](https://github.com/user-attachments/assets/ebb93bc4-900c-44f6-839a-7d958000ab6f)
+
+
+# hermite
+
+```python
+    def draw_hermite_curve(self):
+        if len(self.points) < 4: # # Проверяем, достаточно ли точек для построения кривой
+            return
+        # Получаем координаты последних четырех точек
+        p0 = [self.points[-4].x, self.points[-4].y] # 1
+        p1 = [self.points[-3].x, self.points[-3].y] # 2
+        r0 = [self.points[-2].x - p0[0], self.points[-2].y - p0[1]] # Вектор касательной для первой точки
+        r1 = [self.points[-1].x - p1[0], self.points[-1].y - p1[1]] # Вектор касательной для 2 точки
+        # Генерируем 100 равномерно распределенных значений t от 0 до 1
+        t = my_linspace(0, 1, 100)
+
+        # Матрица Эрмита, описывающая формулу для вычисления кривой
+        m_hermite = create_matrix(4, 4, [
+            2, -2, 1, 1,
+            -3, 3, -2, -1,
+            0, 0, 1, 0,
+            1, 0, 0, 0
+        ])
+
+        # Формирование матрицы параметров t
+        t_vector_data = [[pow(val, 3), pow(val, 2), val, 1] for val in t]
+
+        # Вычисляем значения x и y для кривой Эрмита
+        hermite_x = matrix_mult(m_hermite, create_matrix(4, 1, [p0[0], p1[0], r0[0], r1[0]]))
+        hermite_y = matrix_mult(m_hermite, create_matrix(4, 1, [p0[1], p1[1], r0[1], r1[1]]))
+        # Вычисляем координаты кривой по каждому значению t
+        curve_x = [sum(ti[j] * hermite_x[j][0] for j in range(4)) for ti in t_vector_data]
+        curve_y = [sum(ti[j] * hermite_y[j][0] for j in range(4)) for ti in t_vector_data]
+
+        # Рисование кривой
+        for i in range(len(curve_x) - 1):
+            x1, y1 = curve_x[i], curve_y[i] # Начальные координаты
+            x2, y2 = curve_x[i + 1], curve_y[i + 1] # Конечные координаты
+            line = self.canvas.create_line(x1, y1, x2, y2, fill="orange")   # Рисуем линию между точками
+            self.curve_lines.append(line)
+```
+
+# bezier
+
+```python
+
+    def draw_bezier_curve(self):
+        if len(self.points) < 4:
+            return
+
+        p0 = [self.points[-4].x, self.points[-4].y]
+        p3 = [self.points[-3].x, self.points[-3].y]
+        p1 = [self.points[-2].x, self.points[-2].y]
+        p2 = [self.points[-1].x, self.points[-1].y]
+
+        t = my_linspace(0, 1, 100)
+
+        m_bezier = create_matrix(4, 4, [
+            -1, 3, -3, 1,
+            3, -6, 3, 0,
+            -3, 3, 0, 0,
+            1, 0, 0, 0
+        ])
+
+        t_vector_data = [[pow(val, 3), pow(val, 2), val, 1] for val in t]
+
+        bezier_x = matrix_mult(m_bezier, create_matrix(4, 1, [p0[0], p1[0], p2[0], p3[0]]))
+        bezier_y = matrix_mult(m_bezier, create_matrix(4, 1, [p0[1], p1[1], p2[1], p3[1]]))
+
+        curve_x = [sum(ti[j] * bezier_x[j][0] for j in range(4)) for ti in t_vector_data]
+        curve_y = [sum(ti[j] * bezier_y[j][0] for j in range(4)) for ti in t_vector_data]
+
+        for i in range(len(curve_x) - 1):
+            x1, y1 = curve_x[i], curve_y[i]
+            x2, y2 = curve_x[i + 1], curve_y[i + 1]
+            line = self.canvas.create_line(x1, y1, x2, y2, fill="purple")  # Изменен цвет на фиолетовый
+            self.curve_lines.append(line)
+```
+# bspline
+
+```python
+
+    def draw_bspline_curve(self):
+        if len(self.points) < 2:
+            return
+
+        points = [[point.x, point.y] for point in self.points]
+        n = len(points) - 1
+
+        if len(points) >= 3:
+            extended_points = points + [points[0], points[1], points[2]]
+        else:
+            extended_points = points
+
+        all_curve_segments = []
+        for i in range(len(extended_points) - 3):
+            p0 = extended_points[i]
+            p1 = extended_points[i + 1]
+            p2 = extended_points[i + 2]
+            p3 = extended_points[i + 3]
+
+            t = my_linspace(0, 1, 100)
+
+            m_bspline = create_matrix(4, 4, [
+                -1 / 6, 3 / 6, -3 / 6, 1 / 6,
+                3 / 6, -6 / 6, 3 / 6, 0,
+                -3 / 6, 0, 3 / 6, 0,
+                1 / 6, 4 / 6, 1 / 6, 0
+            ])
+
+            t_vector_data = [[pow(val, 3), pow(val, 2), val, 1] for val in t]
+
+            bspline_x = matrix_mult(m_bspline, create_matrix(4, 1, [p0[0], p1[0], p2[0], p3[0]]))
+            bspline_y = matrix_mult(m_bspline, create_matrix(4, 1, [p0[1], p1[1], p2[1], p3[1]]))
+
+            curve_x = [sum(ti[j] * bspline_x[j][0] for j in range(4)) for ti in t_vector_data]
+            curve_y = [sum(ti[j] * bspline_y[j][0] for j in range(4)) for ti in t_vector_data]
+
+            all_curve_segments.append(list(zip(curve_x, curve_y)))
+
+        for curve in all_curve_segments:
+            for i in range(len(curve) - 1):
+                x1, y1 = curve[i][0], curve[i][1]
+                x2, y2 = curve[i + 1][0], curve[i + 1][1]
+                line = self.canvas.create_line(x1, y1, x2, y2, fill="cyan")  # Изменен цвет на циановый
+                self.curve_lines.append(line)
+```
