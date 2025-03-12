@@ -396,3 +396,9 @@ def draw_line(canvas, x0, y0, x1, y1, debug=False):
                 line = self.canvas.create_line(x1, y1, x2, y2, fill="cyan")  # Изменен цвет на циановый
                 self.curve_lines.append(line)
 ```
+
+
+![image](https://github.com/user-attachments/assets/37914bf4-2947-490a-ae41-c9c1e0d8a108)
+
+
+![image](https://github.com/user-attachments/assets/635e17d2-246c-4bb8-9dad-bed634ed6896)
