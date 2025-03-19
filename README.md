@@ -637,3 +637,102 @@ def scanline_fill(self, x, y):
             stack.append((cx, cy - 1))
 
 ```
+
+ET
+
+```python
+
+def fill_polygon_et(self):
+    if len(self.points) < 3:
+        messagebox.showerror("Ошибка", "Недостаточно точек для полигона")
+        return
+
+    if self.debug_mode:
+        self.prepare_fill_debug('ET')
+        self._step_et_fill()
+    else:
+        # Шаг 1: Создаем таблицу ребер (Edge Table)
+        et = {}
+
+        # Заполняем таблицу ребер (Edge Table)
+        for i in range(len(self.points)):
+            p1 = self.points[i]
+            p2 = self.points[(i + 1) % len(self.points)]  # Следующая точка (цикл)
+
+            # Пропускаем горизонтальные ребра
+            if p1[1] == p2[1]:
+                continue
+
+            # Упорядочиваем точки по Y (по возрастанию)
+            if p1[1] > p2[1]:
+                p1, p2 = p2, p1
+
+            y_min = int(p1[1])
+            y_max = int(p2[1])
+            x = p1[0]
+            dx = p2[0] - p1[0]
+            dy = p2[1] - p1[1]
+            slope = dx / dy  # Наклон ребра
+
+            if y_min not in et:
+                et[y_min] = []
+            et[y_min].append({'y_max': y_max, 'x': x, 'slope': slope})
+
+        if not et:
+            return
+
+        # Шаг 2: Инициализируем активный список ребер (AEL)
+        ael = []
+        current_y = min(et.keys())
+
+        # Шаг 3: Обрабатываем каждый уровень Y
+        while True:
+            # Шаг 3a: Добавляем новые ребра в AEL
+            if current_y in et:
+                for edge in et[current_y]:
+                    ael.append(edge)
+                del et[current_y]  # Удаляем обработанные ребра
+
+            # Шаг 3b: Сортируем AEL по X-координате
+            ael.sort(key=lambda e: e['x'])
+
+            # Шаг 3c: Закрашиваем горизонтальные отрезки между парами ребер
+            i = 0
+            while i < len(ael):
+                if i + 1 >= len(ael):
+                    break
+                e1 = ael[i]
+                e2 = ael[i + 1]
+
+                # Рисуем линию между точками e1.x и e2.x на текущем уровне y
+                x_start = int(e1['x'])
+                x_end = int(e2['x'])
+
+                if x_start < x_end:
+                    self.canvas.create_line(x_start, current_y, x_end, current_y, fill="black")
+
+                i += 2  # Переходим к следующей паре
+
+            # Шаг 3d: Переходим к следующему уровню Y
+            current_y += 1
+
+            # Шаг 3e: Удаляем завершенные ребра из AEL и обновляем их X-координаты
+            new_ael = []
+            for edge in ael:
+                if edge['y_max'] > current_y:
+                    edge['x'] += edge['slope']  # Обновляем X для активных ребер
+                    new_ael.append(edge)
+            ael = new_ael
+
+            # Шаг 4: Проверяем завершение работы
+            if not ael and not et:
+                break
+
+
+```
+
+![image](https://github.com/user-attachments/assets/51b9f279-e3a4-4711-9290-28b4a44bfa94)
+
+
+![image](https://github.com/user-attachments/assets/47dee0ce-0c64-4de9-9016-528adc99bc53)
+
