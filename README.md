@@ -436,3 +436,204 @@ Tkinter: Для создания графического интерфейса �
 Применение матричных преобразований: Все трансформации (поворот, масштабирование, зеркалирование) осуществляются с помощью матриц, которые комбинируются и применяются к вершинам объекта.
 
 Рендеринг: После применения всех трансформаций, объект отрисовывается в OpenGL, и программа обновляет окно, отображая измененный объект.
+
+
+# Polygon
+
+Алгоритм Грэхема
+
+```python
+
+def convex_hull_graham(self):
+    if len(self.points) < 3:
+        messagebox.showerror("Ошибка", "Недостаточно точек для построения выпуклой оболочки")
+        return
+    
+    points = sorted(self.points, key=lambda p: (p[0], p[1]))  # Сортируем точки по x и y
+
+    def cross(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])  # Векторное произведение
+
+    lower = []
+    for p in points:
+        while len(lower) >= 2 and cross(lower[-2], lower[-1], p) <= 0:
+            lower.pop()  # Убираем точки, которые образуют "угол" с обратным знаком
+        lower.append(p)
+    
+    upper = []
+    for p in reversed(points):
+        while len(upper) >= 2 and cross(upper[-2], upper[-1], p) <= 0:
+            upper.pop()
+        upper.append(p)
+
+    hull = lower[:-1] + upper[:-1]  # Убираем последнюю точку в каждой оболочке, так как она повторяется
+    self.draw_polygon(hull, "blue")
+
+```
+
+Алгоритм Джарвиса 
+
+```python
+
+def convex_hull_jarvis(self):
+    if len(self.points) < 3:
+        messagebox.showerror("Ошибка", "Недостаточно точек для построения выпуклой оболочки")
+        return
+
+    def orientation(p, q, r):
+        return (q[1] - p[1]) * (r[0] - q[0]) - (q[0] - p[0]) * (r[1] - q[1])  # Векторное произведение для ориентации
+
+    hull = []
+    leftmost = min(self.points, key=lambda p: p[0])  # Самая левая точка
+    p = leftmost
+    while True:
+        hull.append(p)
+        q = self.points[0]
+        for r in self.points:
+            if q == p or orientation(p, q, r) < 0:  # Если точка r находится слева от pq, выбираем ее
+                q = r
+        p = q
+        if p == leftmost:  # Если мы вернулись к начальной точке, то оболочка найдена
+            break
+
+    self.draw_polygon(hull, "red")
+
+```
+
+Алгоритм заливки с использованием AEL
+
+```python
+
+def fill_polygon_ael(self):
+    if len(self.points) < 3:
+        messagebox.showerror("Ошибка", "Недостаточно точек для полигона")
+        return
+
+    # Создаем таблицу ребер (ET)
+    et = {}
+    for i in range(len(self.points)):
+        p1 = self.points[i]
+        p2 = self.points[(i + 1) % len(self.points)]
+
+        if p1[1] == p2[1]:
+            continue  # Пропускаем горизонтальные ребра
+
+        # Упорядочиваем точки по Y
+        if p1[1] > p2[1]:
+            p1, p2 = p2, p1
+
+        y_min = int(p1[1])
+        y_max = int(p2[1])
+        x = p1[0]
+        dx = p2[0] - p1[0]
+        dy = p2[1] - p1[1]
+        slope = dx / dy  # Δx/Δy
+
+        if y_min not in et:
+            et[y_min] = []
+        et[y_min].append({'y_max': y_max, 'x': x, 'slope': slope})
+
+    if not et:
+        return
+
+    # Инициализация активного списка ребер (AEL)
+    ael = []
+    current_y = min(et.keys())
+
+    while True:
+        # Добавляем новые ребра в AEL
+        if current_y in et:
+            for edge in et[current_y]:
+                ael.append(edge)
+            del et[current_y]
+
+        # Сортируем AEL по x
+        ael.sort(key=lambda e: e['x'])
+
+        # Закрашиваем горизонтальные отрезки
+        i = 0
+        while i < len(ael):
+            e1 = ael[i]
+            if i + 1 >= len(ael):
+                break
+            e2 = ael[i + 1]
+
+            # Рисуем линию между e1.x и e2.x
+            x_start = int(e1['x'])
+            x_end = int(e2['x'])
+
+            if x_start > x_end:
+                x_start, x_end = x_end, x_start
+
+            self.canvas.create_line(x_start, current_y, x_end, current_y, fill="black")
+            i += 2
+
+        # Увеличиваем Y и обновляем AEL
+        current_y += 1
+
+        # Удаляем завершенные ребра
+        ael = [e for e in ael if e['y_max'] > current_y]
+
+        # Обновляем координаты X для оставшихся ребер
+        for edge in ael:
+            edge['x'] += edge['slope']
+
+        # Проверяем завершение
+        if not ael and not et:
+            break
+
+
+```
+
+
+построчное заполнение
+
+```python
+
+def start_scanline_fill(self):
+    """Запуск построчного заполнения"""
+    if len(self.points) < 3:
+        messagebox.showerror("Ошибка", "Сначала постройте полигон")
+        return
+
+    if self.debug_mode:
+        self.prepare_fill_debug('Scanline')
+        self.step_fill()
+    else:
+        def on_click(event):
+            x, y = event.x, event.y
+            if not self.is_point_inside(x, y):
+                messagebox.showerror("Ошибка", "Точка должна быть внутри полигона")
+            else:
+                self.scanline_fill(x, y)
+            self.canvas.unbind("<Button-1>")
+            self.canvas.bind("<Button-1>", self.add_point)
+
+        self.canvas.bind("<Button-1>", on_click)
+        messagebox.showinfo("Инструкция", "Кликните внутри полигона для выбора точки затравки")
+
+```
+
+Алгоритм заливки с затравкой 
+
+```python
+
+def scanline_fill(self, x, y):
+    """Алгоритм заливки с затравкой"""
+    # Псевдокод для выполнения заливки
+    visited = set()
+    stack = [(x, y)]
+
+    while stack:
+        cx, cy = stack.pop()
+        if (cx, cy) not in visited and self.is_point_inside(cx, cy):
+            visited.add((cx, cy))
+            self.canvas.create_line(cx, cy, fill="blue")
+            
+            # Добавляем соседей (вверх, вниз, влево, вправо)
+            stack.append((cx + 1, cy))
+            stack.append((cx - 1, cy))
+            stack.append((cx, cy + 1))
+            stack.append((cx, cy - 1))
+
+```
